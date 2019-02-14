@@ -64,6 +64,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
 
 /**
  * Builder suited for creating a {@link DiscordClient}.
@@ -115,6 +116,9 @@ public final class DiscordClientBuilder {
     private RateLimiter gatewayLimiter;
 
     private Scheduler voiceConnectionScheduler = Schedulers.elastic();
+
+    @Nullable
+    private Function<DiscordWebClient, DiscordWebClient> webClientOptions;
 
     /**
      * Initialize a new builder with the given token.
@@ -465,6 +469,27 @@ public final class DiscordClientBuilder {
         return this;
     }
 
+    /**
+     * Get the current {@link DiscordWebClient} options mapper, allowing user customizable response handling.
+     *
+     * @return the current client options mapper, or {@code null} if no mapper is being used.
+     */
+    @Nullable
+    public Function<DiscordWebClient, DiscordWebClient> getWebClientOptions() {
+        return webClientOptions;
+    }
+
+    /**
+     * Set a new {@link DiscordWebClient} options mapper, allowing user customizable response handling.
+     *
+     * @param mapper the new mapper for web client operations
+     * @return this builder
+     */
+    public DiscordClientBuilder setWebClientOptions(Function<DiscordWebClient, DiscordWebClient> mapper) {
+        this.webClientOptions = mapper;
+        return this;
+    }
+
     private IdentifyOptions initIdentifyOptions() {
         if (identifyOptions != null) {
             IdentifyOptions opts = new IdentifyOptions(
@@ -550,6 +575,13 @@ public final class DiscordClientBuilder {
         return new SimpleBucket(1, Duration.ofSeconds(6));
     }
 
+    private Function<DiscordWebClient, DiscordWebClient> initWebClientOptions() {
+        if (webClientOptions != null) {
+            return webClientOptions;
+        }
+        return Function.identity();
+    }
+
     /**
      * Create a client ready to connect to Discord.
      *
@@ -569,7 +601,8 @@ public final class DiscordClientBuilder {
         // Prepare REST client
         final JacksonResourceProvider jackson = initJacksonResources();
         final HttpClient httpClient = initHttpClient();
-        final DiscordWebClient webClient = initWebClient(httpClient, jackson.getObjectMapper());
+        final DiscordWebClient webClient = initWebClientOptions().apply(
+                initWebClient(httpClient, jackson.getObjectMapper()));
         final RouterFactory routerFactory = initRouterFactory();
         final RestClient restClient = new RestClient(routerFactory.getRouter(webClient));
 

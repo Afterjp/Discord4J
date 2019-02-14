@@ -35,8 +35,11 @@ import reactor.retry.RetryContext;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -175,16 +178,20 @@ class RequestStream<T> {
         }
 
         private Mono<ClientRequest> adaptRequest(DiscordRequest<?> req) {
-            return Mono.fromCallable(() -> new ClientRequest(req.getRoute().getMethod(),
+            return Mono.fromCallable(() -> new ClientRequest(req,
                     RouteUtils.expandQuery(req.getCompleteUri(), req.getQueryParams()),
-                    Optional.ofNullable(req.getHeaders())
-                            .map(map -> map.entrySet().stream()
-                                    .reduce((HttpHeaders) new DefaultHttpHeaders(), (headers, entry) -> {
-                                        String key = entry.getKey();
-                                        entry.getValue().forEach(value -> headers.add(key, value));
-                                        return headers;
-                                    }, HttpHeaders::add))
-                            .orElse(new DefaultHttpHeaders())));
+                    adaptHeaders(req.getHeaders())));
+        }
+
+        private HttpHeaders adaptHeaders(@Nullable Map<String, Set<String>> requestHeaders) {
+            return Optional.ofNullable(requestHeaders)
+                    .map(map -> map.entrySet().stream()
+                            .reduce((HttpHeaders) new DefaultHttpHeaders(), (headers, entry) -> {
+                                String key = entry.getKey();
+                                entry.getValue().forEach(value -> headers.add(key, value));
+                                return headers;
+                            }, HttpHeaders::add))
+                    .orElse(new DefaultHttpHeaders());
         }
 
         @Override

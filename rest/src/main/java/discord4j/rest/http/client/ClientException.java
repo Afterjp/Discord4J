@@ -22,8 +22,12 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import reactor.netty.http.client.HttpClientResponse;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import javax.annotation.Nullable;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class ClientException extends RuntimeException {
 
@@ -66,5 +70,19 @@ public class ClientException extends RuntimeException {
                 ", headers=" + headers.copy().remove(HttpHeaderNames.AUTHORIZATION).toString() +
                 ", errorResponse=" + errorResponse +
                 "}";
+    }
+
+    public static Predicate<Throwable> isStatusCode(int code) {
+        return t -> {
+            if (t instanceof ClientException) {
+                ClientException e = (ClientException) t;
+                return e.getStatus().code() == code;
+            }
+            return false;
+        };
+    }
+
+    public static <T> Function<Mono<T>, Publisher<T>> emptyOnStatus(int code) {
+        return mono -> mono.onErrorResume(isStatusCode(code), t -> Mono.empty());
     }
 }
